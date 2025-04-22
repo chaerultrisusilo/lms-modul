@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class UsersController extends Controller
 {
@@ -12,19 +14,23 @@ class UsersController extends Controller
      */
     public function index()
     {
-        $title = "Data Users";
-        // select * from users
-        $datas = User::get();
+        $title = "Data User";
+
+        // eager load roles
+        $datas = User::with('roles')->get();
+
+        // return $datas;
+
         return view('users.index', compact('title', 'datas'));
     }
 
     /**
      * Show the form for creating a new resource.
      */
-
     public function create()
     {
-        return view('users.create');
+        $roles = Role::where('is_active', 1)->get();
+        return view('users.create', compact('roles'));
     }
 
     /**
@@ -32,11 +38,14 @@ class UsersController extends Controller
      */
     public function store(Request $request)
     {
-        User::create([
-            'name' => $request->user_name,
+        $user = User::create([
+            'name' => $request->name,
             'email' => $request->email,
             'password' => bcrypt($request->password),
+            'majors_id' => 1
         ]);
+
+        $user->roles()->attach($request->roles);
 
         return redirect()->to('users');
     }
@@ -54,8 +63,10 @@ class UsersController extends Controller
      */
     public function edit(string $id)
     {
-        $edit = User::find($id);
-        return view('users.edit', compact('edit'));
+        $edit = User::with('roles')->findOrFail($id);
+        $roles = Role::all();
+        // return $roles;
+        return view('users.edit', compact('edit', 'roles'));
     }
 
     /**
@@ -63,15 +74,19 @@ class UsersController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        // Categories::where('id', $id)->update([
-        //     'category_name' => $request->category_name,
-        // ]);
+        $user = User::findOrFail($id);
 
-        $user = User::find($id);
-        $user->user_name = $request->user_name;
-        $user->save();
+        $user->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'is_active' => $request->is_active,
+            'password' => bcrypt($request->password),
+        ]);
 
-        return redirect()->to('categories');
+        if ($request->has('roles')) {
+            $user->roles()->sync($request->roles);
+        }
+        return redirect()->to('users');
     }
 
     /**
@@ -80,8 +95,7 @@ class UsersController extends Controller
     public function destroy(string $id)
     {
         User::where('id', $id)->delete();
-        // $user= Users::find($id);
-        // $user->delete();
+
         return redirect()->to('users');
     }
 }
